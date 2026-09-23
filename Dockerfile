@@ -12,7 +12,11 @@ COPY migrations ./migrations
 COPY alembic.ini ./
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
 
-RUN pip install --upgrade pip && pip install . && chmod +x ./docker/entrypoint.sh
+RUN pip install . && chmod +x ./docker/entrypoint.sh
+
+# Non-root runtime user (numeric UID so Kubernetes/ECS can verify it).
+RUN useradd --create-home --uid 1000 appuser && chown -R 1000:1000 /app
+USER 1000
 
 EXPOSE 8000
 
