@@ -1,0 +1,88 @@
+# This compose file manages ONLY the Sales Service and its own database.
+# It deliberately does not know about the legacy monolith or the User Service.
+services:
+  sales-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sales
+      POSTGRES_PASSWORD: sales
+      POSTGRES_DB: sales
+    ports:
+      - "5434:5432"        # host 5434 -> avoid clashing with other local PGs
+    volumes:
+      - sales-postgres-data:/var/lib/postgresql/data
+    networks:
+      default: {}
+      # So postgres-exporter-sales (observability-infrastructure) can reach
+      # this DB by name. Read-only exporter; no data here changes.
+      migration-network:
+        aliases:
+          - sales-postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sales -d sales"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  sales-service:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://sales:sales@sales-postgres:5432/sales
+      APP_ENV: development
+      LOG_LEVEL: INFO
+      SERVICE_NAME: sales-service
+    ports:
+      - "8080:8000"        # host 8080 -> avoid clashing with other local apps
+    depends_on:
+      sales-postgres:
+        condition: service_healthy
+    networks:
+      default: {}
+      # So Prometheus can scrape :8000/metrics by name.
+      migration-network:
+        aliases:
+          - sales-service
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    stop_grace_period: 25s
+
+  # CDC consumer: legacy.public.sales (Kafka/Debezium, from the
+  # cdc-infrastructure repo) -> this service's own database. Separate
+  # process, same image/build as sales-service, does not serve HTTP. Needs
+  # the shared cross-repo network to reach the Kafka broker. Mirrors
+  # user-service's `user-service-cdc` service.
+  sales-service-cdc:
+    build: .
+    command: ["python", "-m", "app.cdc"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://sales:sales@sales-postgres:5432/sales
+      APP_ENV: development
+      LOG_LEVEL: INFO
+      SERVICE_NAME: sales-service-cdc
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SALES_TOPIC: legacy.public.sales
+      KAFKA_CONSUMER_GROUP: sales-service-cdc
+      KAFKA_AUTO_OFFSET_RESET: earliest
+      CDC_METRICS_PORT: "9201"
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+    ports:
+      - "9201:9201"
+    depends_on:
+      sales-postgres:
+        condition: service_healthy
+    networks:
+      default: {}
+      migration-network:
+        aliases:
+          - sales-service-cdc
+    restart: unless-stopped
+
+networks:
+  migration-network:
+    external: true
+
+volumes:
+  sales-postgres-data:

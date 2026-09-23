@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sales-service"
+version = "0.1.0"
+description = "Sales microservice (Strangler Fig migration from the legacy monolith)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "psycopg2-binary>=2.9.9",
+    "alembic>=1.13",
+    "prometheus-client>=0.20,<1.0",
+    "confluent-kafka>=2.3",
+    "opentelemetry-api>=1.27,<2.0",
+    "opentelemetry-sdk>=1.27,<2.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27,<2.0",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.48b0",
+    "opentelemetry-instrumentation-logging>=0.48b0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+]
+
+[tool.setuptools]
+packages = ["app", "app.routes"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "unit: fast, isolated, no real Kafka/Postgres/network",
+    "integration: uses a real Postgres (isolated test DB) and/or real Kafka",
+    "e2e: full real stack, end-to-end",
+    "slow: takes more than a few seconds",
+    "failure: chaos/failure-injection scenario",
+]
