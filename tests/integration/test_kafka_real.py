@@ -3,6 +3,7 @@
 user-service/tests/integration/test_kafka_real.py; adapted to Sale fields.
 Every test uses its own uniquely-named topic and consumer group.
 """
+
 from __future__ import annotations
 
 import json
@@ -57,8 +58,12 @@ def _produce(producer, topic, entity_id, op, **kw):
 
 def _make_consumer(topic: str, group: str, session_factory=SessionLocal):
     raw = Consumer(
-        {"bootstrap.servers": KAFKA_BOOTSTRAP, "group.id": group,
-         "auto.offset.reset": "earliest", "enable.auto.commit": False}
+        {
+            "bootstrap.servers": KAFKA_BOOTSTRAP,
+            "group.id": group,
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
+        }
     )
     wrapper = SalesCdcConsumer(raw, session_factory=session_factory, topic=topic)
     wrapper.subscribe()
@@ -83,8 +88,16 @@ def _get_sale(session, sale_id):
     return session.get(Sale, sale_id)
 
 
-def _payload(id_, user_id=1, item_name="Real Kafka Sale", quantity=1, created_at="2026-01-01T00:00:00Z"):
-    return {"id": id_, "user_id": user_id, "item_name": item_name, "quantity": quantity, "created_at": created_at}
+def _payload(
+    id_, user_id=1, item_name="Real Kafka Sale", quantity=1, created_at="2026-01-01T00:00:00Z"
+):
+    return {
+        "id": id_,
+        "user_id": user_id,
+        "item_name": item_name,
+        "quantity": quantity,
+        "created_at": created_at,
+    }
 
 
 class TestRealKafkaCreateUpdateDeleteTombstone:
@@ -93,17 +106,27 @@ class TestRealKafkaCreateUpdateDeleteTombstone:
         wrapper, raw = _make_consumer(topic, group)
         entity_id = 80001
         try:
-            _produce(producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Created"))
+            _produce(
+                producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Created")
+            )
             _drain_one(wrapper, raw)
             assert _get_sale(db_session, entity_id).item_name == "Created"
 
-            _produce(producer, topic, entity_id, "u", before=_payload(entity_id, item_name="Created"),
-                      after=_payload(entity_id, item_name="Updated", quantity=5))
+            _produce(
+                producer,
+                topic,
+                entity_id,
+                "u",
+                before=_payload(entity_id, item_name="Created"),
+                after=_payload(entity_id, item_name="Updated", quantity=5),
+            )
             _drain_one(wrapper, raw)
             sale = _get_sale(db_session, entity_id)
             assert sale.item_name == "Updated" and sale.quantity == 5
 
-            _produce(producer, topic, entity_id, "d", before=_payload(entity_id, item_name="Updated"))
+            _produce(
+                producer, topic, entity_id, "d", before=_payload(entity_id, item_name="Updated")
+            )
             _drain_one(wrapper, raw)
             assert _get_sale(db_session, entity_id) is None
 
@@ -132,7 +155,9 @@ class TestDuplicateDelivery:
 
 
 class TestConsumerRestart:
-    def test_new_consumer_instance_same_group_continues_from_committed_offset(self, producer, db_session):
+    def test_new_consumer_instance_same_group_continues_from_committed_offset(
+        self, producer, db_session
+    ):
         topic, group = _unique_topic(), _unique_group()
         wrapper1, raw1 = _make_consumer(topic, group)
         e1, e2 = 80003, 80004
@@ -153,7 +178,9 @@ class TestConsumerRestart:
 
 
 class TestCrashBeforeDbCommit:
-    def test_redelivery_after_apply_failure_ends_in_exactly_one_correct_row(self, producer, db_session, monkeypatch):
+    def test_redelivery_after_apply_failure_ends_in_exactly_one_correct_row(
+        self, producer, db_session, monkeypatch
+    ):
         topic, group = _unique_topic(), _unique_group()
         entity_id = 80005
 
@@ -161,12 +188,17 @@ class TestCrashBeforeDbCommit:
 
         real_apply = consumer_module.apply_sale_event
         monkeypatch.setattr(
-            consumer_module, "apply_sale_event",
-            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("simulated crash before db commit")),
+            consumer_module,
+            "apply_sale_event",
+            lambda *a, **kw: (_ for _ in ()).throw(
+                RuntimeError("simulated crash before db commit")
+            ),
         )
         wrapper1, raw1 = _make_consumer(topic, group)
         try:
-            _produce(producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Crashed"))
+            _produce(
+                producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Crashed")
+            )
             with pytest.raises(RuntimeError, match="simulated crash"):
                 _drain_one(wrapper1, raw1)
             assert _get_sale(db_session, entity_id) is None
@@ -209,14 +241,20 @@ class TestCrashAfterDbCommitBeforeOffsetCommit:
         entity_id = 80006
 
         real_raw1 = Consumer(
-            {"bootstrap.servers": KAFKA_BOOTSTRAP, "group.id": group,
-             "auto.offset.reset": "earliest", "enable.auto.commit": False}
+            {
+                "bootstrap.servers": KAFKA_BOOTSTRAP,
+                "group.id": group,
+                "auto.offset.reset": "earliest",
+                "enable.auto.commit": False,
+            }
         )
         flaky1 = _FlakyCommitConsumer(real_raw1, fail_times=1)
         wrapper1 = SalesCdcConsumer(flaky1, session_factory=SessionLocal, topic=topic)
         wrapper1.subscribe()
         try:
-            _produce(producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Committed"))
+            _produce(
+                producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Committed")
+            )
             with pytest.raises(RuntimeError, match="simulated broker unavailable"):
                 _drain_one(wrapper1, flaky1)
             assert _get_sale(db_session, entity_id).item_name == "Committed"
@@ -239,12 +277,24 @@ class TestOutOfOrder:
         wrapper, raw = _make_consumer(topic, group)
         entity_id = 80007
         try:
-            _produce(producer, topic, entity_id, "u", before=_payload(entity_id, item_name="Never-existed"),
-                      after=_payload(entity_id, item_name="Updated-First"))
+            _produce(
+                producer,
+                topic,
+                entity_id,
+                "u",
+                before=_payload(entity_id, item_name="Never-existed"),
+                after=_payload(entity_id, item_name="Updated-First"),
+            )
             _drain_one(wrapper, raw)
             assert _get_sale(db_session, entity_id).item_name == "Updated-First"
 
-            _produce(producer, topic, entity_id, "c", after=_payload(entity_id, item_name="Created-Second"))
+            _produce(
+                producer,
+                topic,
+                entity_id,
+                "c",
+                after=_payload(entity_id, item_name="Created-Second"),
+            )
             _drain_one(wrapper, raw)
             assert _get_sale(db_session, entity_id).item_name == "Created-Second"
         finally:
@@ -274,8 +324,12 @@ class TestDestinationDatabaseDown:
             raise RuntimeError("simulated destination database down")
 
         raw = Consumer(
-            {"bootstrap.servers": KAFKA_BOOTSTRAP, "group.id": group,
-             "auto.offset.reset": "earliest", "enable.auto.commit": False}
+            {
+                "bootstrap.servers": KAFKA_BOOTSTRAP,
+                "group.id": group,
+                "auto.offset.reset": "earliest",
+                "enable.auto.commit": False,
+            }
         )
         wrapper = SalesCdcConsumer(raw, session_factory=_broken_session_factory, topic=topic)
         wrapper.subscribe()
@@ -294,12 +348,16 @@ class TestObservabilityAfterRealPublish:
         topic, group = _unique_topic(), _unique_group()
         wrapper, raw = _make_consumer(topic, group)
         entity_id = 80010
-        before = metrics.EVENTS_PROCESSED_TOTAL.labels(service=metrics.SERVICE_NAME, operation="c")._value.get()
+        before = metrics.EVENTS_PROCESSED_TOTAL.labels(
+            service=metrics.SERVICE_NAME, operation="c"
+        )._value.get()
         try:
             _produce(producer, topic, entity_id, "c", after=_payload(entity_id))
             _drain_one(wrapper, raw)
         finally:
             raw.close()
 
-        after = metrics.EVENTS_PROCESSED_TOTAL.labels(service=metrics.SERVICE_NAME, operation="c")._value.get()
+        after = metrics.EVENTS_PROCESSED_TOTAL.labels(
+            service=metrics.SERVICE_NAME, operation="c"
+        )._value.get()
         assert after == before + 1

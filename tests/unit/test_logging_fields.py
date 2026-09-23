@@ -8,6 +8,7 @@ elsewhere in the suite calls `configure_logging()`, which does
 `root.handlers.clear()` - that would silently break caplog's own root
 handler for the rest of the session if these tests relied on it.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -69,8 +70,17 @@ class _FakeSession:
 
 
 def _message(op="c", offset=3, partition=0, value=b"x"):
-    body = {"op": op, "after": {"id": 501, "user_id": 7, "item_name": "W", "quantity": 1,
-                                 "created_at": "2026-01-01T00:00:00Z"}, "source": {"ts_ms": 1}}
+    body = {
+        "op": op,
+        "after": {
+            "id": 501,
+            "user_id": 7,
+            "item_name": "W",
+            "quantity": 1,
+            "created_at": "2026-01-01T00:00:00Z",
+        },
+        "source": {"ts_ms": 1},
+    }
     payload = json.dumps(body).encode("utf-8") if value is not None else None
 
     class Msg:
@@ -90,7 +100,9 @@ def _message(op="c", offset=3, partition=0, value=b"x"):
 
 
 def test_applied_log_carries_topic_partition_offset_op_sale_id_user_id(monkeypatch):
-    monkeypatch.setattr(consumer_module, "apply_sale_event", lambda session, envelope: session.commit())
+    monkeypatch.setattr(
+        consumer_module, "apply_sale_event", lambda session, envelope: session.commit()
+    )
     consumer = SalesCdcConsumer(_FakeKafkaConsumer(), session_factory=lambda: _FakeSession())
 
     with _capture("sales.cdc") as handler:

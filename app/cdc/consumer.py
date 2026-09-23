@@ -42,7 +42,7 @@ settings = get_settings()
 try:
     from opentelemetry import trace
 
-    _tracer = trace.get_tracer("sales.cdc")
+    _tracer: trace.Tracer | None = trace.get_tracer("sales.cdc")
 except ImportError:  # pragma: no cover - otel is an optional dependency
     _tracer = None
 
@@ -122,7 +122,9 @@ class SalesCdcConsumer:
         if raw_value is None:
             # Delete tombstone (log-compaction marker): no operation to apply.
             logger.info("cdc.tombstone_skipped", extra=log_base)
-            metrics.EVENTS_PROCESSED_TOTAL.labels(service=metrics.SERVICE_NAME, operation="tombstone").inc()
+            metrics.EVENTS_PROCESSED_TOTAL.labels(
+                service=metrics.SERVICE_NAME, operation="tombstone"
+            ).inc()
             self._commit_offset(message)
             metrics.LAST_EVENT_TIMESTAMP.labels(service=metrics.SERVICE_NAME).set(time.time())
             metrics.LAST_EVENT_OFFSET.labels(
@@ -169,7 +171,9 @@ class SalesCdcConsumer:
         source_ts_ms = envelope.source.ts_ms if envelope.source else envelope.ts_ms
         metrics.record_end_to_end_latency(source_ts_ms)
 
-        metrics.EVENTS_PROCESSED_TOTAL.labels(service=metrics.SERVICE_NAME, operation=envelope.op).inc()
+        metrics.EVENTS_PROCESSED_TOTAL.labels(
+            service=metrics.SERVICE_NAME, operation=envelope.op
+        ).inc()
         logger.info("cdc.applied", extra=log_extra)
         self._commit_offset(message)
         metrics.LAST_EVENT_TIMESTAMP.labels(service=metrics.SERVICE_NAME).set(time.time())

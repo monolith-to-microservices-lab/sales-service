@@ -70,9 +70,7 @@ async def _import_conflict(request: Request, exc: ImportConflictError) -> JSONRe
 
 
 @app.exception_handler(RequestValidationError)
-async def _validation_error(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     return _error(422, "validation error", errors=jsonable_encoder(exc.errors()))
 
 

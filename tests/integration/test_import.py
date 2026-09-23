@@ -55,17 +55,13 @@ def test_native_create_after_high_id_import_does_not_collide(client):
         json={**LEGACY, "id": 1000},
     )
 
-    r = client.post(
-        "/sales", json={"user_id": 1, "item_name": "Native", "quantity": 1}
-    )
+    r = client.post("/sales", json={"user_id": 1, "item_name": "Native", "quantity": 1})
     assert r.status_code == 201
     new_id = r.json()["id"]
     assert new_id > 1000  # sequence was realigned past the imported id
 
     # and a second native create keeps climbing
-    r2 = client.post(
-        "/sales", json={"user_id": 1, "item_name": "Native2", "quantity": 1}
-    )
+    r2 = client.post("/sales", json={"user_id": 1, "item_name": "Native2", "quantity": 1})
     assert r2.json()["id"] == new_id + 1
 
 

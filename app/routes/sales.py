@@ -32,9 +32,7 @@ def get_sale(sale_id: int, db: Session = Depends(get_db)) -> SaleRead:
 
 
 @router.put("/{sale_id}", response_model=SaleRead)
-def update_sale(
-    sale_id: int, payload: SaleUpdate, db: Session = Depends(get_db)
-) -> SaleRead:
+def update_sale(sale_id: int, payload: SaleUpdate, db: Session = Depends(get_db)) -> SaleRead:
     return SaleRead.model_validate(service.update_sale(db, sale_id, payload))
 
 

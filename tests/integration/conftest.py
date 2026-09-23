@@ -3,6 +3,7 @@ the actual `sales_test` database (schema upgrade/downgrade + TRUNCATE between
 tests) - kept out of the root conftest.py so tests/unit/** never pays that
 cost or that risk.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -11,10 +12,9 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from tests.conftest import assert_test_database
-
 from app.database import SessionLocal, engine
 from app.main import app
+from tests.conftest import assert_test_database
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -6,20 +6,22 @@ import json
 import logging
 import sys
 from contextvars import ContextVar
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Populated by RequestContextMiddleware for the lifetime of each request.
 correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 
-_RESERVED = set(
-    logging.LogRecord("", 0, "", 0, "", None, None).__dict__.keys()
-) | {"message", "asctime", "taskName"}
+_RESERVED = set(logging.LogRecord("", 0, "", 0, "", None, None).__dict__.keys()) | {
+    "message",
+    "asctime",
+    "taskName",
+}
 
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, object] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

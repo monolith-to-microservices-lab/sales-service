@@ -1,6 +1,7 @@
 """Unit test for the X-Request-ID correlation middleware in isolation - a
 minimal Starlette app wrapping only RequestContextMiddleware, no database.
 """
+
 from __future__ import annotations
 
 from starlette.applications import Starlette

@@ -2,6 +2,7 @@
 against an in-memory SQLite session (no Postgres, no Kafka). Mirrors
 user-service/tests/unit/test_apply.py; field names adapted to Sale.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -11,7 +12,13 @@ from app.cdc.events import DebeziumSaleEnvelope
 from app.models import Sale
 from tests.unit.conftest import get_sale
 
-AFTER = {"id": 501, "user_id": 1, "item_name": "Widget", "quantity": 2, "created_at": "2026-01-01T00:00:00Z"}
+AFTER = {
+    "id": 501,
+    "user_id": 1,
+    "item_name": "Widget",
+    "quantity": 2,
+    "created_at": "2026-01-01T00:00:00Z",
+}
 
 
 def _envelope(**kw) -> DebeziumSaleEnvelope:
@@ -50,7 +57,8 @@ class TestUpdate:
     def test_update_existing_sale_changes_fields(self, db_session):
         apply_sale_event(db_session, _envelope(after=AFTER, op="c"))
         apply_sale_event(
-            db_session, _envelope(before=AFTER, after={**AFTER, "quantity": 10, "item_name": "Gadget"}, op="u")
+            db_session,
+            _envelope(before=AFTER, after={**AFTER, "quantity": 10, "item_name": "Gadget"}, op="u"),
         )
         sale = get_sale(db_session, 501)
         assert sale.quantity == 10
@@ -69,7 +77,9 @@ class TestUpdate:
         no FK to validate against locally (see README "Referential Integrity").
         """
         apply_sale_event(db_session, _envelope(after=AFTER, op="c"))
-        apply_sale_event(db_session, _envelope(before=AFTER, after={**AFTER, "user_id": 42}, op="u"))
+        apply_sale_event(
+            db_session, _envelope(before=AFTER, after={**AFTER, "user_id": 42}, op="u")
+        )
         assert get_sale(db_session, 501).user_id == 42
 
 

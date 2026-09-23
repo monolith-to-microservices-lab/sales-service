@@ -2,6 +2,7 @@
 real Postgres, no real Kafka. Mirrors
 user-service/tests/unit/test_consumer_transaction_order.py.
 """
+
 from __future__ import annotations
 
 import json
@@ -47,8 +48,17 @@ class SpySession:
 
 
 def _message(op="c", offset=0, value: bytes | None = b"placeholder"):
-    body = {"op": op, "after": {"id": 1, "user_id": 1, "item_name": "W", "quantity": 1,
-                                 "created_at": "2026-01-01T00:00:00Z"}, "source": {"ts_ms": 1}}
+    body = {
+        "op": op,
+        "after": {
+            "id": 1,
+            "user_id": 1,
+            "item_name": "W",
+            "quantity": 1,
+            "created_at": "2026-01-01T00:00:00Z",
+        },
+        "source": {"ts_ms": 1},
+    }
     payload = json.dumps(body).encode("utf-8") if value is not None else None
 
     class Msg:
@@ -77,7 +87,9 @@ def _consumer_with_spy_apply(calls: list[str], fail_apply: bool = False, fail_co
 def test_db_commit_happens_before_kafka_offset_commit(monkeypatch):
     calls: list[str] = []
     consumer, kafka, calls = _consumer_with_spy_apply(calls)
-    monkeypatch.setattr(consumer_module, "apply_sale_event", lambda session, envelope: session.commit())
+    monkeypatch.setattr(
+        consumer_module, "apply_sale_event", lambda session, envelope: session.commit()
+    )
 
     consumer.process_message(_message(offset=5))
 
@@ -88,7 +100,9 @@ def test_db_commit_happens_before_kafka_offset_commit(monkeypatch):
 def test_db_failure_rolls_back_and_never_reaches_kafka_commit(monkeypatch):
     calls: list[str] = []
     consumer, kafka, calls = _consumer_with_spy_apply(calls, fail_apply=True)
-    monkeypatch.setattr(consumer_module, "apply_sale_event", lambda session, envelope: session.commit())
+    monkeypatch.setattr(
+        consumer_module, "apply_sale_event", lambda session, envelope: session.commit()
+    )
 
     before = metrics.EVENTS_FAILED_TOTAL.labels(service=metrics.SERVICE_NAME)._value.get()
 
@@ -105,22 +119,30 @@ def test_db_failure_rolls_back_and_never_reaches_kafka_commit(monkeypatch):
 def test_kafka_offset_commit_failure_after_successful_db_commit(monkeypatch):
     calls: list[str] = []
     consumer, kafka, calls = _consumer_with_spy_apply(calls, fail_commit=True)
-    monkeypatch.setattr(consumer_module, "apply_sale_event", lambda session, envelope: session.commit())
+    monkeypatch.setattr(
+        consumer_module, "apply_sale_event", lambda session, envelope: session.commit()
+    )
 
-    before = metrics.KAFKA_OFFSET_COMMIT_FAILED_TOTAL.labels(service=metrics.SERVICE_NAME)._value.get()
+    before = metrics.KAFKA_OFFSET_COMMIT_FAILED_TOTAL.labels(
+        service=metrics.SERVICE_NAME
+    )._value.get()
 
     with pytest.raises(RuntimeError, match="simulated broker unavailable"):
         consumer.process_message(_message(offset=9))
 
     assert calls == ["db_commit", "db_close", "kafka_commit"]
     assert kafka.committed_offsets == []
-    after = metrics.KAFKA_OFFSET_COMMIT_FAILED_TOTAL.labels(service=metrics.SERVICE_NAME)._value.get()
+    after = metrics.KAFKA_OFFSET_COMMIT_FAILED_TOTAL.labels(
+        service=metrics.SERVICE_NAME
+    )._value.get()
     assert after == before + 1
 
 
 def test_tombstone_never_calls_apply_but_still_commits_offset(monkeypatch):
     called = {"apply": False}
-    monkeypatch.setattr(consumer_module, "apply_sale_event", lambda *_: called.__setitem__("apply", True))
+    monkeypatch.setattr(
+        consumer_module, "apply_sale_event", lambda *_: called.__setitem__("apply", True)
+    )
     consumer = SalesCdcConsumer(SpyKafkaConsumer([]), session_factory=lambda: SpySession([]))
 
     consumer.process_message(_message(offset=1, value=None))

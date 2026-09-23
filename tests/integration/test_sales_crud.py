@@ -56,9 +56,12 @@ def test_delete_sale(client):
 
 def test_missing_sale_returns_404(client):
     assert client.get("/sales/999999").status_code == 404
-    assert client.put(
-        "/sales/999999", json={"user_id": 1, "item_name": "x", "quantity": 1}
-    ).status_code == 404
+    assert (
+        client.put(
+            "/sales/999999", json={"user_id": 1, "item_name": "x", "quantity": 1}
+        ).status_code
+        == 404
+    )
     assert client.delete("/sales/999999").status_code == 404
 
 

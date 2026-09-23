@@ -21,7 +21,5 @@ def import_sale(
     payload: SaleImport, response: Response, db: Session = Depends(get_db)
 ) -> ImportResult:
     sale, outcome = service.import_sale(db, payload)
-    response.status_code = (
-        status.HTTP_201_CREATED if outcome == "created" else status.HTTP_200_OK
-    )
+    response.status_code = status.HTTP_201_CREATED if outcome == "created" else status.HTTP_200_OK
     return ImportResult(outcome=outcome, sale=SaleRead.model_validate(sale))

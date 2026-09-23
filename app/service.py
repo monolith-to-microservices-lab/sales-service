@@ -5,7 +5,8 @@ No repository layer on purpose — the service is small.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -18,8 +19,8 @@ from .schemas import SaleCreate, SaleImport, SaleUpdate
 def _normalize_dt(value: datetime) -> datetime:
     """Compare timestamps as the same instant, tolerating naive input (UTC)."""
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _sync_identity_sequence(db: Session) -> None:
@@ -30,18 +31,14 @@ def _sync_identity_sequence(db: Session) -> None:
     the sequence to MAX(id) (is_called=true => next value is MAX(id)+1).
     """
     db.execute(
-        text(
-            "SELECT setval("
-            "  pg_get_serial_sequence('sales', 'id'),"
-            "  (SELECT MAX(id) FROM sales)"
-            ")"
-        )
+        text("SELECT setval(  pg_get_serial_sequence('sales', 'id'),  (SELECT MAX(id) FROM sales))")
     )
 
 
 # --------------------------------------------------------------------------- #
 # Normal CRUD
 # --------------------------------------------------------------------------- #
+
 
 def create_sale(db: Session, data: SaleCreate) -> Sale:
     sale = Sale(
@@ -87,6 +84,7 @@ def delete_sale(db: Session, sale_id: int) -> None:
 # Legacy import (idempotent)
 # --------------------------------------------------------------------------- #
 
+
 def import_sale(db: Session, data: SaleImport) -> tuple[Sale, str]:
     """Idempotent upsert-by-identity for legacy migration.
 
@@ -111,13 +109,13 @@ def import_sale(db: Session, data: SaleImport) -> tuple[Sale, str]:
         db.refresh(sale)
         return sale, "created"
 
-    incoming = {
+    incoming: dict[str, Any] = {
         "user_id": data.user_id,
         "item_name": data.item_name,
         "quantity": data.quantity,
         "created_at": _normalize_dt(data.created_at),
     }
-    current = {
+    current: dict[str, Any] = {
         "user_id": existing.user_id,
         "item_name": existing.item_name,
         "quantity": existing.quantity,

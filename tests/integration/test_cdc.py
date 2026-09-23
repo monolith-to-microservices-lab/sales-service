@@ -55,15 +55,37 @@ class FakeKafkaConsumer:
         pass
 
 
-def _sale_row(id: int, user_id: int, item_name: str = "Widget", quantity: int = 1,
-              created_at: str = "2026-01-01T00:00:00Z") -> dict:
-    return {"id": id, "user_id": user_id, "item_name": item_name, "quantity": quantity, "created_at": created_at}
+def _sale_row(
+    id: int,
+    user_id: int,
+    item_name: str = "Widget",
+    quantity: int = 1,
+    created_at: str = "2026-01-01T00:00:00Z",
+) -> dict:
+    return {
+        "id": id,
+        "user_id": user_id,
+        "item_name": item_name,
+        "quantity": quantity,
+        "created_at": created_at,
+    }
 
 
-def _message(op: str, offset: int, *, before: dict | None = None, after: dict | None = None,
-             source_ts_ms: int = 1) -> FakeMessage:
-    body = {"op": op, "before": before, "after": after, "source": {"table": "sales", "ts_ms": source_ts_ms},
-            "ts_ms": source_ts_ms}
+def _message(
+    op: str,
+    offset: int,
+    *,
+    before: dict | None = None,
+    after: dict | None = None,
+    source_ts_ms: int = 1,
+) -> FakeMessage:
+    body = {
+        "op": op,
+        "before": before,
+        "after": after,
+        "source": {"table": "sales", "ts_ms": source_ts_ms},
+        "ts_ms": source_ts_ms,
+    }
     return FakeMessage(json.dumps(body).encode("utf-8"), offset=offset)
 
 
@@ -87,7 +109,9 @@ def _get(session, sale_id: int) -> Sale | None:
 
 def test_create_event_inserts_sale(cdc_consumer, db_session):
     consumer, fake = cdc_consumer
-    consumer.process_message(_message("c", 0, after=_sale_row(701, user_id=1, item_name="Keyboard")))
+    consumer.process_message(
+        _message("c", 0, after=_sale_row(701, user_id=1, item_name="Keyboard"))
+    )
 
     sale = _get(db_session, 701)
     assert sale is not None
@@ -98,10 +122,16 @@ def test_create_event_inserts_sale(cdc_consumer, db_session):
 
 def test_update_event_updates_existing_sale(cdc_consumer, db_session):
     consumer, fake = cdc_consumer
-    consumer.process_message(_message("c", 0, after=_sale_row(702, user_id=1, item_name="Mouse", quantity=1)))
     consumer.process_message(
-        _message("u", 1, before=_sale_row(702, user_id=1, item_name="Mouse", quantity=1),
-                  after=_sale_row(702, user_id=1, item_name="Mouse", quantity=5))
+        _message("c", 0, after=_sale_row(702, user_id=1, item_name="Mouse", quantity=1))
+    )
+    consumer.process_message(
+        _message(
+            "u",
+            1,
+            before=_sale_row(702, user_id=1, item_name="Mouse", quantity=1),
+            after=_sale_row(702, user_id=1, item_name="Mouse", quantity=5),
+        )
     )
 
     sale = _get(db_session, 702)
@@ -145,7 +175,9 @@ def test_reprocessing_same_message_is_idempotent(cdc_consumer, db_session):
     assert rows[0].item_name == "Monitor"
 
 
-def test_db_error_is_not_committed_and_offset_is_not_advanced(cdc_consumer, db_session, monkeypatch):
+def test_db_error_is_not_committed_and_offset_is_not_advanced(
+    cdc_consumer, db_session, monkeypatch
+):
     consumer, fake = cdc_consumer
 
     def _boom(session, envelope):
@@ -179,7 +211,9 @@ def test_restart_redelivery_does_not_duplicate_sale(db_session):
     assert rows[0].item_name == "Chair"
 
 
-def test_sale_referencing_user_not_locally_known_is_applied_without_validation(cdc_consumer, db_session):
+def test_sale_referencing_user_not_locally_known_is_applied_without_validation(
+    cdc_consumer, db_session
+):
     """The Sales Service's Sale model has no FK to a local users table (it
     lives in a different database/service) - a sale event for a user_id this
     service has never heard of must still apply cleanly, with no synchronous
@@ -210,8 +244,12 @@ def test_sale_events_processed_out_of_order_still_converge(cdc_consumer, db_sess
 
     # "update" arrives first for a sale this consumer has never seen.
     consumer.process_message(
-        _message("u", 0, before=_sale_row(709, user_id=1, item_name="Early"),
-                  after=_sale_row(709, user_id=1, item_name="Updated-First"))
+        _message(
+            "u",
+            0,
+            before=_sale_row(709, user_id=1, item_name="Early"),
+            after=_sale_row(709, user_id=1, item_name="Updated-First"),
+        )
     )
     sale = _get(db_session, 709)
     assert sale is not None
@@ -219,7 +257,9 @@ def test_sale_events_processed_out_of_order_still_converge(cdc_consumer, db_sess
 
     # the "create" for the same id arrives afterward (out of order) - upsert
     # semantics mean it just re-applies its own after-state, no error.
-    consumer.process_message(_message("c", 1, after=_sale_row(709, user_id=1, item_name="Created-Second")))
+    consumer.process_message(
+        _message("c", 1, after=_sale_row(709, user_id=1, item_name="Created-Second"))
+    )
     sale = _get(db_session, 709)
     assert sale.item_name == "Created-Second"
     assert fake.committed_offsets == [0, 1]

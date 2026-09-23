@@ -16,6 +16,4 @@ class ImportConflictError(Exception):
         self.sale_id = sale_id
         self.current = current
         self.incoming = incoming
-        super().__init__(
-            f"Sale {sale_id} already exists with different data (import conflict)"
-        )
+        super().__init__(f"Sale {sale_id} already exists with different data (import conflict)")

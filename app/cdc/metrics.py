@@ -6,6 +6,7 @@ comparable/filterable in Grafana by the `service` label alone - no separate
 "sales_*" metric family. No offset/user_id/sale_id ever becomes a label
 (unbounded cardinality) - those go in the structured logs instead.
 """
+
 from __future__ import annotations
 
 import time
@@ -56,7 +57,9 @@ LAST_EVENT_TIMESTAMP = Gauge(
     "cdc_last_event_timestamp_seconds", "Unix timestamp of the last event processed", ["service"]
 )
 LAST_EVENT_OFFSET = Gauge(
-    "cdc_last_event_offset", "Kafka offset of the last event processed", ["service", "topic", "partition"]
+    "cdc_last_event_offset",
+    "Kafka offset of the last event processed",
+    ["service", "topic", "partition"],
 )
 
 
