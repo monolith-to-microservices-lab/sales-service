@@ -467,3 +467,27 @@ monolith, traffic cutover. (CDC/Debezium via Kafka *is* now implemented -
 see "CDC consumer" above - one-directional, legacy -> this service, only.)
 
 Those come in later stages, after the three systems are reviewed in isolation.
+
+## CI
+
+Every pull request to `main` (and every push to `main`) runs, with no deploy and no cloud credentials:
+
+| Workflow | Job | What it proves |
+|---|---|---|
+| `ci.yml` | **Lint** | `ruff check`, `ruff format --check`, Hadolint (Dockerfile), ShellCheck (entrypoint) |
+| | **Type Check** | `mypy` (no global ignores, no per-module overrides) |
+| | **Unit Tests** | `pytest -m unit` + coverage + JUnit report |
+| | **Integration Tests** | `alembic upgrade head` on a fresh DB, then `pytest -m integration` against a **real PostgreSQL 16** (`sales_test`) and a **real Kafka 3.9.1** (throw-away topics/consumer groups) |
+| | **Build** | `docker build`, image runs as non-root (UID 1000), Trivy image scan (HIGH/CRITICAL with a fix fails), `docker compose config` |
+| `security.yml` | **Security** | Gitleaks (full history, redacted), Bandit (`app/`), pip-audit (declared dependencies), Trivy config (SARIF → Code Scanning). Also weekly. |
+
+Coverage baseline when CI was introduced: unit 68%, integration 80%. No threshold is enforced yet.
+
+Run the same checks locally:
+
+```bash
+pip install -e ".[dev]"
+ruff check . && ruff format --check . && mypy
+pytest -m unit
+TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/sales_test pytest -m integration   # needs Postgres + Kafka on localhost:9092
+```
